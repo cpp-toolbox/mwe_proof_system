@@ -14,6 +14,7 @@ Proof::Proof(std::vector<FormulaPtr> assumptions, FormulaPtr target) : assumptio
         throw std::invalid_argument("Invalid assumption: " + claimed->to_string());
     });
 
+    register_rule("IMPLIES", implies_rule);
     register_rule("FORALL", forall_rule);
     register_rule("EQ", eq_rule);
     register_rule("AND", and_rule);
@@ -317,6 +318,34 @@ FormulaPtr forall_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed
     if (instantiated->to_string() != claimed->to_string()) {
         throw std::invalid_argument("Claimed formula " + claimed->to_string() + " does not match derived formula " +
                                     instantiated->to_string());
+    }
+
+    return claimed;
+}
+
+FormulaPtr implies_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed) {
+    if (inputs.size() != 2)
+        throw std::invalid_argument("IMPLIES rule requires 2 inputs: an implication and its antecedent");
+
+    // first input must be an implication formula
+    auto implies_ptr = std::get_if<ImpliesFormula>(&inputs[0]->data);
+    if (!implies_ptr)
+        throw std::invalid_argument("First input must be an implication formula");
+
+    // second input should match the antecedent (left side of implication)
+    FormulaPtr antecedent = implies_ptr->l;
+    FormulaPtr consequent = implies_ptr->r;
+
+    if (antecedent->to_string() != inputs[1]->to_string()) {
+        throw std::invalid_argument("Second input does not match the antecedent of the implication. "
+                                    "Expected " +
+                                    antecedent->to_string() + " but got " + inputs[1]->to_string());
+    }
+
+    // the claimed formula must match the consequent
+    if (consequent->to_string() != claimed->to_string()) {
+        throw std::invalid_argument("Claimed formula " + claimed->to_string() +
+                                    " does not match the implication's consequent " + consequent->to_string());
     }
 
     return claimed;

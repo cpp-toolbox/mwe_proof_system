@@ -70,6 +70,7 @@ class Proof {
 FormulaPtr assumption_rule(const std::vector<FormulaPtr> &, FormulaPtr claimed);
 FormulaPtr and_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);
 FormulaPtr forall_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);
+FormulaPtr implies_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);
 FormulaPtr eq_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);
 FormulaPtr induction_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);
 FormulaPtr excluded_middle_rule(const std::vector<FormulaPtr> &inputs, FormulaPtr claimed);

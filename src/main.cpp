@@ -316,9 +316,9 @@ int main() {
             return Formula::make_rel(text_utils::element_of, {el, natural_numbers});
         };
 
-        std::vector<FormulaPtr> my_chidern;
+        std::vector<FormulaPtr> element_of_nat_assumptions;
         for (const auto &va : vas) {
-            my_chidern.push_back(make_el_of_nat(va));
+            element_of_nat_assumptions.push_back(make_el_of_nat(va));
         }
 
         // transitivity
@@ -337,16 +337,21 @@ int main() {
         FormulaPtr forall_a = Formula::make_forall("a", natural_numbers, forall_b);
         FormulaPtr transitivity = forall_a;
 
+        FormulaPtr innermost_refl = Formula::make_implies(Formula::make_eq(a, b), Formula::make_eq(b, a));
+        FormulaPtr inner_refl = Formula::make_forall("b", natural_numbers, innermost_refl);
+        FormulaPtr reflexivity = Formula::make_forall("a", natural_numbers, inner_refl);
+
         // Target: va_x_3 = va_y_0 and va_y_3 = va_x_0
         FormulaPtr va_x_3_eq_va_y_0 = Formula::make_eq(va_x_3, va_y_0);
         FormulaPtr va_x_0_eq_va_y_3 = Formula::make_eq(va_y_3, va_x_0);
         FormulaPtr swapped = Formula::make_and(va_x_3_eq_va_y_0, va_x_0_eq_va_y_3);
 
         std::vector<FormulaPtr> assumptions = {
-            va_x_0_eq_va_x_1,       va_x_2_eq_va_x_3,    va_y_0_eq_va_y_1, va_y_1_eq_va_y_2,    va_temp_1_eq_va_temp_2,
-            va_temp_2_eq_va_temp_3, va_temp_1_eq_va_x_1, va_x_2_eq_va_y_2, va_y_3_eq_va_temp_3, transitivity};
+            va_x_0_eq_va_x_1,       va_x_2_eq_va_x_3,       va_y_0_eq_va_y_1,    va_y_1_eq_va_y_2,
+            va_temp_1_eq_va_temp_2, va_temp_2_eq_va_temp_3, va_temp_1_eq_va_x_1, va_x_2_eq_va_y_2,
+            va_y_3_eq_va_temp_3,    transitivity,           reflexivity};
 
-        for (const auto &chidern : my_chidern) {
+        for (const auto &chidern : element_of_nat_assumptions) {
             assumptions.push_back(chidern);
         }
 
@@ -358,20 +363,31 @@ int main() {
 
         // a replaced by va_x_3
         // forall b, forall c, (...)
-        auto son = substitute_term_in_formula(forall_b, a, va_x_3);
-        proof.add_line_to_proof(son, "FORALL", {9, 13});
+        auto fab_fac = substitute_term_in_formula(forall_b, a, va_x_3);
+        proof.add_line_to_proof(fab_fac, "FORALL", {9, 14});
 
         proof.print();
 
-        // a replaced by va_x_2
+        // b replaced by va_x_2
         // forall c, (...)
-        auto my_god = std::get_if<ForallFormula>(&son->data)->inner;
-        auto my_b = substitute_term_in_formula(my_god, b, va_x_2);
-        proof.add_line_to_proof(my_b, "FORALL", {21, 12});
+        auto fac = std::get_if<ForallFormula>(&fab_fac->data)->inner;
+        auto fac_b_replaced = substitute_term_in_formula(fac, b, va_x_2);
+        proof.add_line_to_proof(fac_b_replaced, "FORALL", {22, 13});
 
-        auto hello_world = std::get_if<ForallFormula>(&my_b->data)->inner;
-        auto my_hello = substitute_term_in_formula(hello_world, c, va_y_2);
-        proof.add_line_to_proof(my_hello, "FORALL", {22, 16});
+        auto inner_forall = std::get_if<ForallFormula>(&fac_b_replaced->data)->inner;
+        auto inner_fa_c_replaced = substitute_term_in_formula(inner_forall, c, va_y_2);
+        proof.add_line_to_proof(inner_fa_c_replaced, "FORALL", {23, 17});
+
+        proof.print();
+
+        auto refl_1 = substitute_term_in_formula(inner_refl, a, va_x_2);
+        auto refl_2 = substitute_term_in_formula(std::get_if<ForallFormula>(&refl_1->data)->inner, b, va_x_3);
+        proof.add_line_to_proof(refl_1, "FORALL", {10, 13});
+        proof.add_line_to_proof(refl_2, "FORALL", {25, 14});
+        auto va_x_3_eq_va_x_2 = Formula::make_eq(va_x_3, va_x_2);
+        proof.add_line_to_proof(va_x_3_eq_va_x_2, "IMPLIES", {26, 1});
+        proof.add_line_to_proof(Formula::make_and(va_x_3_eq_va_x_2, va_x_2_eq_va_y_2), "AND", {27, 7});
+        proof.add_line_to_proof(Formula::make_eq(va_x_3, va_y_2), "IMPLIES", {24, 28});
 
         proof.print();
 
