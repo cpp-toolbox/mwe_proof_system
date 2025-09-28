@@ -13,7 +13,7 @@
 // ---------- Helpers for our fixed mathematical language ----------
 
 // Variables: v1, v2, ...
-inline bool is_variable(const std::string &s) {
+bool is_variable(const std::string &s) {
     if (s.empty() || s[0] != 'v')
         return false;
     for (size_t i = 1; i < s.size(); ++i)
@@ -23,15 +23,15 @@ inline bool is_variable(const std::string &s) {
 }
 
 // Constants: "0", "1"
-inline bool is_constant(const std::string &s) { return s == "0" || s == "1"; }
+bool is_constant(const std::string &s) { return s == "0" || s == "1"; }
 
 // Function symbols: succ (1-ary), + (2-ary), * (2-ary)
-inline bool is_function(const std::string &s, int arity) {
+bool is_function(const std::string &s, int arity) {
     return (s == "succ" && arity == 1) || (s == "+" && arity == 2) || (s == "*" && arity == 2);
 }
 
 // Relation symbols: < (2-ary)
-inline bool is_relation(const std::string &s, int arity) { return (s == "<" && arity == 2); }
+bool is_relation(const std::string &s, int arity) { return (s == "<" && arity == 2); }
 
 // ---------- Terms ----------
 
@@ -40,6 +40,7 @@ TermPtr Term::make_constant(const std::string &c) { return std::make_shared<Term
 TermPtr Term::make_function(const std::string &f, std::vector<TermPtr> args) {
     return std::make_shared<Term>(Term{FunctionTerm{f, std::move(args)}});
 }
+TermPtr Term::make_tuple(std::vector<TermPtr> args) { return std::make_shared<Term>(Term{TupleTerm{std::move(args)}}); }
 
 std::string Term::to_string() const {
     if (auto p = std::get_if<VariableTerm>(&data))
@@ -61,6 +62,16 @@ std::string Term::to_string() const {
             ss << ")";
         }
         return ss.str();
+    }
+    if (auto p = std::get_if<TupleTerm>(&data)) {
+        std::ostringstream ss;
+        ss << "(";
+        for (size_t i = 0; i < p->args.size(); ++i) {
+            ss << p->args[i]->to_string();
+            if (i + 1 < p->args.size())
+                ss << ", ";
+        }
+        ss << ")";
     }
     return "?";
 }
@@ -221,6 +232,12 @@ bool occurs_in_term(const std::string &v, TermPtr t) {
                 return true;
         }
     }
+    if (auto p = std::get_if<TupleTerm>(&t->data)) {
+        for (auto &arg : p->args) {
+            if (occurs_in_term(v, arg))
+                return true;
+        }
+    }
     return false;
 }
 
@@ -270,6 +287,9 @@ void collect_vars_in_term(TermPtr t, std::set<std::string> &vars) {
     if (auto p = std::get_if<VariableTerm>(&t->data)) {
         vars.insert(p->var);
     } else if (auto p = std::get_if<FunctionTerm>(&t->data)) {
+        for (auto &arg : p->args)
+            collect_vars_in_term(arg, vars);
+    } else if (auto p = std::get_if<TupleTerm>(&t->data)) {
         for (auto &arg : p->args)
             collect_vars_in_term(arg, vars);
     }
@@ -330,6 +350,14 @@ TermPtr substitute_term_in_term(TermPtr u, TermPtr pattern, TermPtr replacement)
             new_args.push_back(substitute_term_in_term(arg, pattern, replacement));
         }
         return Term::make_function(p->f, new_args);
+    }
+
+    if (auto p = std::get_if<TupleTerm>(&u->data)) {
+        std::vector<TermPtr> new_args;
+        for (auto &arg : p->args) {
+            new_args.push_back(substitute_term_in_term(arg, pattern, replacement));
+        }
+        return Term::make_tuple(new_args);
     }
 
     // Variables and constants that do not match pattern remain unchanged

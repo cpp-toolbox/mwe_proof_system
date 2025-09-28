@@ -1,5 +1,6 @@
 #include <iostream>
 #include "utility/proof/proof.hpp"
+#include "utility/proof_system/proof_system.hpp"
 #include "utility/text_utils/text_utils.hpp"
 
 int main() {
@@ -264,6 +265,126 @@ int main() {
         } else {
             std::cout << "Proof is NOT valid.\n";
         }
+        std::cout << "\n";
+    }
+    {
+        std::cout << "=== Variable Reassignment (Swap) Proof ===\n";
+
+        // Terms
+        TermPtr x = Term::make_constant("x");
+        TermPtr y = Term::make_constant("y");
+        TermPtr temp = Term::make_constant("temp");
+        TermPtr zero = Term::make_constant("0");
+        TermPtr one = Term::make_constant("1");
+        TermPtr two = Term::make_constant("2");
+        TermPtr three = Term::make_constant("3");
+
+        TermPtr va_x_0 = Term::make_function("va", {x, zero});
+        TermPtr va_x_1 = Term::make_function("va", {x, one});
+        TermPtr va_x_2 = Term::make_function("va", {x, two});
+        TermPtr va_x_3 = Term::make_function("va", {x, three});
+
+        TermPtr va_y_0 = Term::make_function("va", {y, zero});
+        TermPtr va_y_1 = Term::make_function("va", {y, one});
+        TermPtr va_y_2 = Term::make_function("va", {y, two});
+        TermPtr va_y_3 = Term::make_function("va", {y, three});
+
+        TermPtr va_temp_1 = Term::make_function("va", {temp, one});
+        TermPtr va_temp_2 = Term::make_function("va", {temp, two});
+        TermPtr va_temp_3 = Term::make_function("va", {temp, three});
+
+        std::vector<TermPtr> vas = {
+            va_x_0, va_x_1, va_x_2, va_x_3, va_y_0, va_y_1, va_y_2, va_y_3, va_temp_1, va_temp_2, va_temp_3,
+        };
+
+        // Assumptions
+        FormulaPtr va_x_0_eq_va_x_1 = Formula::make_eq(va_x_0, va_x_1);
+        FormulaPtr va_x_2_eq_va_x_3 = Formula::make_eq(va_x_2, va_x_3);
+
+        FormulaPtr va_y_0_eq_va_y_1 = Formula::make_eq(va_y_0, va_y_1);
+        FormulaPtr va_y_1_eq_va_y_2 = Formula::make_eq(va_y_1, va_y_2);
+
+        FormulaPtr va_temp_1_eq_va_temp_2 = Formula::make_eq(va_temp_1, va_temp_2);
+        FormulaPtr va_temp_2_eq_va_temp_3 = Formula::make_eq(va_temp_2, va_temp_3);
+
+        FormulaPtr va_temp_1_eq_va_x_1 = Formula::make_eq(va_temp_1, va_x_1);
+        FormulaPtr va_x_2_eq_va_y_2 = Formula::make_eq(va_x_2, va_y_2);
+        FormulaPtr va_y_3_eq_va_temp_3 = Formula::make_eq(va_y_3, va_temp_3);
+
+        // element of natural assumptiosn (bad)
+        auto make_el_of_nat = [&](TermPtr el) {
+            return Formula::make_rel(text_utils::element_of, {el, natural_numbers});
+        };
+
+        std::vector<FormulaPtr> my_chidern;
+        for (const auto &va : vas) {
+            my_chidern.push_back(make_el_of_nat(va));
+        }
+
+        // transitivity
+        TermPtr a = Term::make_variable("a");
+        TermPtr b = Term::make_variable("b");
+        TermPtr c = Term::make_variable("c");
+
+        FormulaPtr a_eq_b = Formula::make_eq(a, b);
+        FormulaPtr b_eq_c = Formula::make_eq(b, c);
+        FormulaPtr a_eq_c = Formula::make_eq(a, c);
+        FormulaPtr a_eq_b_and_b_eq_c = Formula::make_and(a_eq_b, b_eq_c);
+        FormulaPtr a_eq_b_and_b_eq_c_implies_a_eq_c = Formula::make_implies(a_eq_b_and_b_eq_c, a_eq_c);
+
+        FormulaPtr forall_c = Formula::make_forall("c", natural_numbers, a_eq_b_and_b_eq_c_implies_a_eq_c);
+        FormulaPtr forall_b = Formula::make_forall("b", natural_numbers, forall_c);
+        FormulaPtr forall_a = Formula::make_forall("a", natural_numbers, forall_b);
+        FormulaPtr transitivity = forall_a;
+
+        // Target: va_x_3 = va_y_0 and va_y_3 = va_x_0
+        FormulaPtr va_x_3_eq_va_y_0 = Formula::make_eq(va_x_3, va_y_0);
+        FormulaPtr va_x_0_eq_va_y_3 = Formula::make_eq(va_y_3, va_x_0);
+        FormulaPtr swapped = Formula::make_and(va_x_3_eq_va_y_0, va_x_0_eq_va_y_3);
+
+        std::vector<FormulaPtr> assumptions = {
+            va_x_0_eq_va_x_1,       va_x_2_eq_va_x_3,    va_y_0_eq_va_y_1, va_y_1_eq_va_y_2,    va_temp_1_eq_va_temp_2,
+            va_temp_2_eq_va_temp_3, va_temp_1_eq_va_x_1, va_x_2_eq_va_y_2, va_y_3_eq_va_temp_3, transitivity};
+
+        for (const auto &chidern : my_chidern) {
+            assumptions.push_back(chidern);
+        }
+
+        Proof proof(assumptions, swapped);
+
+        for (const FormulaPtr &assumption : assumptions) {
+            proof.add_line_to_proof(assumption, "ASSUMPTION");
+        }
+
+        // a replaced by va_x_3
+        // forall b, forall c, (...)
+        auto son = substitute_term_in_formula(forall_b, a, va_x_3);
+        proof.add_line_to_proof(son, "FORALL", {9, 13});
+
+        proof.print();
+
+        // a replaced by va_x_2
+        // forall c, (...)
+        auto my_god = std::get_if<ForallFormula>(&son->data)->inner;
+        auto my_b = substitute_term_in_formula(my_god, b, va_x_2);
+        proof.add_line_to_proof(my_b, "FORALL", {21, 12});
+
+        auto hello_world = std::get_if<ForallFormula>(&my_b->data)->inner;
+        auto my_hello = substitute_term_in_formula(hello_world, c, va_y_2);
+        proof.add_line_to_proof(my_hello, "FORALL", {22, 16});
+
+        proof.print();
+
+        // proof.add_line_to_proof(y_in_X, );
+        // proof.add_line_to_proof(y_eq_5, "FORALL", {1, 0});
+        //
+        // proof.print();
+
+        // if (proof.is_valid()) {
+        //     std::cout << "Proof is valid for target: " << y_eq_5->to_string() << "\n";
+        // } else {
+        //     std::cout << "Proof is NOT valid.\n";
+        // }
         std::cout << "\n";
     }
 

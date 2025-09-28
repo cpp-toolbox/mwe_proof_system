@@ -11,6 +11,7 @@
 bool is_variable(const std::string &s);
 bool is_constant(const std::string &s);
 bool is_function(const std::string &s, int arity);
+// bool is_tuple(std::string &s, int arity);
 bool is_relation(const std::string &s, int arity);
 
 // ---------- Terms ----------
@@ -27,18 +28,22 @@ struct FunctionTerm {
     std::string f;
     std::vector<TermPtr> args;
 };
+struct TupleTerm {
+    std::vector<TermPtr> args;
+};
 
 /**
  * @brief terms are like objects which evaluate to something, or are variables, but don't have an inherit truth or
  * falsity to them
  */
 struct Term {
-    using variant_t = std::variant<VariableTerm, ConstantTerm, FunctionTerm>;
+    using variant_t = std::variant<VariableTerm, ConstantTerm, FunctionTerm, TupleTerm>;
     variant_t data;
 
     static TermPtr make_variable(const std::string &v);
     static TermPtr make_constant(const std::string &c);
     static TermPtr make_function(const std::string &f, std::vector<TermPtr> args);
+    static TermPtr make_tuple(std::vector<TermPtr> args);
 
     std::string to_string() const;
     bool is_well_formed(std::string *err = nullptr) const;
